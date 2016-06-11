@@ -1,25 +1,27 @@
 extern crate rand;
+use rand::Rng;
 
-fn merge_sort<T: Copy + PartialOrd>(x: &mut [T]) {
-	if x.len() <= 1 {
-		return;
-	}
+fn tiny_sort<T: Copy + PartialOrd>(x: &mut [T]) {
+	if x.len() <= 1 { return; }
 	if x.len() == 2 {
-		if x[0] > x[1] {
-			x.swap(0, 1);
-		}
+		if x[0] > x[1] { x.swap(0, 1); }
 		return;
 	}
 	if x.len() == 3 {
-		if x[0] > x[1] {
-			x.swap(0, 1);
+		for &(i,j) in [(0,1),(1,2),(0,1)].iter() {
+			if x[i] > x[j] { x.swap(i, j); }
 		}
-		if x[1] > x[2] {
-			x.swap(1, 2);
-		}
-		if x[0] > x[1] {
-			x.swap(0, 1);
-		}
+		return;
+	}
+	
+	for &(i,j) in [(0,1),(1,2),(2,3),(1,2),(0,1),(1,2)].iter() {
+		if x[i] > x[j] { x.swap(i, j); }
+	}
+}
+
+fn merge_sort<T: Copy + PartialOrd>(x: &mut [T]) {
+	if x.len() <= 4 {
+		tiny_sort(x);
 		return;
 	}
 	
@@ -58,7 +60,7 @@ fn merge_sort<T: Copy + PartialOrd>(x: &mut [T]) {
 
 fn quick_sort<T: Copy + PartialOrd, R: rand::Rng>(x: &mut [T], rng: &mut R) {
 
-	if x.len() <= 6 {
+	if x.len() <= 8 {
 		merge_sort(x);
 		return;
 	}
@@ -84,10 +86,48 @@ fn quick_sort<T: Copy + PartialOrd, R: rand::Rng>(x: &mut [T], rng: &mut R) {
 	quick_sort(&mut gt, rng);
 }
 
+#[derive(Clone,Copy,Debug)]
+struct A(i32);
+
+static mut N: i32 = 0;
+
+impl std::cmp::PartialEq for A {
+	fn eq(&self, other: &A) -> bool {
+		self.0 == other.0
+	}
+}
+
+impl std::cmp::PartialOrd for A {
+	fn partial_cmp(&self, other: &A) -> Option<std::cmp::Ordering> {
+		unsafe {
+			N += 1;
+		}
+		self.0.partial_cmp(&other.0)
+	}
+}
+
 fn main() {
-	let mut x = vec![9,8,7,1,4,3,2,7,0,4,2,7,6,5,1,3,9,8,4,3,2,1];
+	//let mut rng = rand::weak_rng();
+	//let mut rng = rand::XorShiftRng::new_unseeded();	
+	let seed: &[_] = &[1, 2, 3, 50];
+	let mut rng: rand::StdRng = rand::SeedableRng::from_seed(seed);
+
+	let mut x = Vec::new();
 	
-	quick_sort(&mut x, &mut rand::weak_rng());
+	for _ in 0..3 {
+		x.push(A(rng.gen_range(-10, 10)));
+	}
 	
-	println!("{:?}", x);
+	quick_sort(&mut x, &mut rng);
+	
+	unsafe {
+		println!("{} compare done", N);
+	}
+
+	for i in 0..x.len()-1 {
+		if x[i] > x[i+1] {
+			println!("sort error");
+		}
+	}
+	
 }
