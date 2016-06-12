@@ -1,133 +1,173 @@
+extern crate time;
 extern crate rand;
+extern crate gnuplot;
+
+mod heap;
+mod merge;
+mod quick;
+
+use gnuplot::{Color, Caption, AxesCommon};
 use rand::Rng;
 
-fn tiny_sort<T: Copy + PartialOrd>(x: &mut [T]) {
-	if x.len() <= 1 { return; }
-	if x.len() == 2 {
-		if x[0] > x[1] { x.swap(0, 1); }
-		return;
-	}
-	if x.len() == 3 {
-		for &(i,j) in [(0,1),(1,2),(0,1)].iter() {
-			if x[i] > x[j] { x.swap(i, j); }
-		}
-		return;
-	}
-	
-	for &(i,j) in [(0,1),(1,2),(2,3),(1,2),(0,1),(1,2)].iter() {
-		if x[i] > x[j] { x.swap(i, j); }
-	}
-}
 
-fn merge_sort<T: Copy + PartialOrd>(x: &mut [T]) {
-	if x.len() <= 4 {
-		tiny_sort(x);
-		return;
-	}
-	
-	let m = x.len() / 2;
-	{
-		let (mut left, mut right) = x.split_at_mut(m);
-		merge_sort(&mut left);
-		merge_sort(&mut right);
-	}
-	
-	let mut i = 0;
-	let mut j = m;
-	
-	let mut y: Vec<T> = Vec::with_capacity(x.len());
-	
-	while i < m && j < x.len() {
-		if x[i] < x[j] {
-			y.push(x[i]);
-			i += 1;
-		} else {
-			y.push(x[j]);
-			j += 1;
-		}
-	}
-	while i < m {
-		y.push(x[i]);
-		i += 1;
-	}
-	while j < x.len() {
-		y.push(x[j]);
-		j += 1;
-	}
-	
-	x.copy_from_slice(&y);
-}
-
-fn quick_sort<T: Copy + PartialOrd, R: rand::Rng>(x: &mut [T], rng: &mut R) {
-
-	if x.len() <= 8 {
-		merge_sort(x);
-		return;
-	}
-	
-	let n = x.len();
-	let p = rng.gen_range(0, x.len());
-	x.swap(n - 1, p);
-	let p = x[x.len() - 1];
-	
-	let mut j = 0;
-	
-	for i in 0..x.len()-1 {
-		if x[i] <= p {
-			x.swap(i, j);
-			j += 1;
-		}
-	}
-	x.swap(j, n - 1);
-	
-	let (mut lteq, mut gt) = x.split_at_mut(j+1);
-	let (mut lt, _) = lteq.split_at_mut(j);
-	quick_sort(&mut lt, rng);
-	quick_sort(&mut gt, rng);
-}
-
-#[derive(Clone,Copy,Debug)]
 struct A(i32);
 
-static mut N: i32 = 0;
+static mut NCMP: usize = 0;
+static mut NCPY: usize = 0;
 
 impl std::cmp::PartialEq for A {
 	fn eq(&self, other: &A) -> bool {
 		self.0 == other.0
 	}
 }
+impl std::cmp::Eq for A {}
 
 impl std::cmp::PartialOrd for A {
 	fn partial_cmp(&self, other: &A) -> Option<std::cmp::Ordering> {
 		unsafe {
-			N += 1;
+			NCMP += 1;
 		}
 		self.0.partial_cmp(&other.0)
 	}
 }
-
-fn main() {
-	//let mut rng = rand::weak_rng();
-	//let mut rng = rand::XorShiftRng::new_unseeded();	
-	let seed: &[_] = &[1, 2, 3, 50];
-	let mut rng: rand::StdRng = rand::SeedableRng::from_seed(seed);
-
-	let mut x = Vec::new();
-	
-	for _ in 0..3 {
-		x.push(A(rng.gen_range(-10, 10)));
+impl std::cmp::Ord for A {
+	fn cmp(&self, other: &A) -> std::cmp::Ordering {
+		unsafe {
+			NCMP += 1;
+		}
+		self.0.cmp(&other.0)
 	}
-	
-	quick_sort(&mut x, &mut rng);
+}
+
+impl std::fmt::Debug for A {
+	fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Clone for A {
+	fn clone(&self) -> A {
+		unsafe { NCPY += 1; }
+		A(self.0)
+	}
+}
+
+impl Copy for A {
+}
+
+fn bench<F>(n: usize, f: F) -> (f64, usize, usize) 
+	where F: Fn(&mut [A]) {
+	let mut rng = rand::weak_rng();
+	let mut x = Vec::new();
+	for _ in 0..n {
+		x.push(A(rng.gen_range(i32::min_value(), i32::max_value())));
+	}
 	
 	unsafe {
-		println!("{} compare done", N);
+		NCMP = 0;
+		NCPY = 0;
 	}
-
-	for i in 0..x.len()-1 {
-		if x[i] > x[i+1] {
-			println!("sort error");
+	
+	let t0 = time::precise_time_s();
+	f(&mut x);
+	let t1 = time::precise_time_s();
+	
+	if n > 1 {
+		for i in 0..n-1 {
+			if x[i] > x[i+1] {
+				println!("sort error");
+			}
 		}
 	}
 	
+	let (ncmp, ncpy);
+	unsafe {
+		ncmp = NCMP;
+		NCMP = 0;
+		ncpy = NCPY;
+		NCPY = 0;
+	}
+	(t1 - t0, ncmp, ncpy)
+}
+
+fn chain_bench<F>(nmax: usize, nstep: usize, amount: usize, f: F) -> (Vec<usize>, Vec<f64>, Vec<usize>, Vec<usize>) 
+	where F: Fn(&mut [A]) {
+	
+	let mut ns = Vec::new();
+	let mut ts = Vec::new();
+	let mut cs = Vec::new();
+	let mut cps = Vec::new();
+	
+	let mut n = 0;
+	while n < nmax {
+		let mut t = 0.0;
+		let mut c = 0;
+		let mut cp = 0;
+
+		for _ in 0..amount {
+			let (ti, ci, cpi) = bench(n, &f);
+			t += ti;
+			c += ci;
+			cp += cpi;
+		}
+		
+		ns.push(n);
+		ts.push(t / amount as f64);
+		cs.push(c / amount);
+		cps.push(cp / amount);
+		
+		n += nstep;
+	}
+	
+	(ns, ts, cs, cps)
+}
+
+fn main() {
+	let (nmax, nstep, amount) = (10000, 63, 21);
+
+	let mut fg_time = gnuplot::Figure::new();
+	let mut fg_cmp = gnuplot::Figure::new();
+	let mut fg_cpy = gnuplot::Figure::new();
+	{
+		let mut a_time = fg_time.axes2d()
+		.set_title("time", &[]);
+		
+		let mut a_cmp = fg_cmp.axes2d()
+		.set_title("compare", &[]);
+		
+		let mut a_cpy = fg_cpy.axes2d()
+		.set_title("clone", &[]);
+
+
+		let (ns, ts, cmps, cpys) = chain_bench(nmax, nstep, amount, 
+			quick::quick_sort);
+			
+		a_time.points(&ns, &ts, &[Color("red"), Caption("quick")]);
+		a_cmp.points(&ns, &cmps, &[Color("red"), Caption("quick")]);
+		a_cpy.points(&ns, &cpys, &[Color("red"), Caption("quick")]);
+
+		let (ns, ts, cmps, cpys) = chain_bench(nmax, nstep, amount, 
+			heap::heap_sort);
+			
+		a_time.points(&ns, &ts, &[Color("blue"), Caption("heap")]);
+		a_cmp.points(&ns, &cmps, &[Color("blue"), Caption("heap")]);
+		a_cpy.points(&ns, &cpys, &[Color("blue"), Caption("heap")]);
+
+		let (ns, ts, cmps, cpys) = chain_bench(nmax, nstep, amount, 
+			merge::merge_sort);
+			
+		a_time.points(&ns, &ts, &[Color("green"), Caption("merge")]);
+		a_cmp.points(&ns, &cmps, &[Color("green"), Caption("merge")]);
+		a_cpy.points(&ns, &cpys, &[Color("green"), Caption("merge")]);
+
+		let (ns, ts, cmps, cpys) = chain_bench(nmax, nstep, amount, 
+			|x| x.sort());
+			
+		a_time.points(&ns, &ts, &[Color("black"), Caption("std")]);
+		a_cmp.points(&ns, &cmps, &[Color("black"), Caption("std")]);
+		a_cpy.points(&ns, &cpys, &[Color("black"), Caption("std")]);
+	}
+	fg_time.show();
+	fg_cmp.show();
+	fg_cpy.show();
 }

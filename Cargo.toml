@@ -5,3 +5,5 @@ authors = ["Mario Geiger <geiger.mario@gmail.com>"]
 
 [dependencies]
 rand = "*"
+time = "*"
+gnuplot = "*"
