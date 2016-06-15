@@ -1,4 +1,4 @@
-#[allow(dead_code)]
+// takes two sorted lists and merged them into one list
 fn merge<T: Copy + PartialOrd>(x1: &[T], x2: &[T], y: &mut [T]) {
 	assert_eq!(x1.len() + x2.len(), y.len());
 	let mut i = 0;
@@ -23,7 +23,6 @@ fn merge<T: Copy + PartialOrd>(x1: &[T], x2: &[T], y: &mut [T]) {
 	}
 }
 
-#[allow(dead_code)]
 pub fn merge_sort<T: Copy + PartialOrd>(x: &mut [T]) {
 	let n = x.len();
 	let mut y = x.to_vec();

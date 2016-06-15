@@ -1,0 +1,3 @@
+    sudo apt-get install rustc cargo
+    cargo run --release
+    

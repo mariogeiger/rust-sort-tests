@@ -1,17 +1,4 @@
-#[allow(dead_code)]
-#[inline]
-fn pa(i: usize) -> usize {
-	(i - 1) / 2
-}
-
-#[allow(dead_code)]
-#[inline]
-fn ch(i: usize) -> usize {
-	2 * i + 1
-}
-
 // add the last element of the slice onto the heap
-#[allow(dead_code)]
 pub fn heap_add<T: PartialOrd>(x: &mut [T]) {
 	let mut i = x.len() - 1;
 	
@@ -26,7 +13,6 @@ pub fn heap_add<T: PartialOrd>(x: &mut [T]) {
 }
 
 // remove the head and put it at the end
-#[allow(dead_code)]
 pub fn heap_pop<T: PartialOrd>(x: &mut [T]) {
 	let n = x.len() - 1; // size of the new heap
 	x.swap(0, n);        // pop out the root
@@ -50,7 +36,6 @@ pub fn heap_pop<T: PartialOrd>(x: &mut [T]) {
 	}
 }
 
-#[allow(dead_code)]
 pub fn heap_sort<T: PartialOrd>(x: &mut [T]) {
 	for i in 1..x.len()+1 {
 		heap_add(&mut x[0..i]);
@@ -60,9 +45,3 @@ pub fn heap_sort<T: PartialOrd>(x: &mut [T]) {
 	}
 }
 
-#[allow(dead_code)]
-fn main() {
-	let mut x = [0,4,3,2,1,9,8,7];
-	heap_sort(&mut x);
-	println!("{:?}", x);
-}

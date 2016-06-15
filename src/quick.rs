@@ -1,4 +1,3 @@
-#[allow(dead_code)]
 pub fn quick_sort<T: PartialOrd>(x: &mut [T]) {
 	let n = x.len();
 	if n < 2 {
