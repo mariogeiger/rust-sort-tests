@@ -30,15 +30,23 @@ pub fn heap_pop<T: PartialOrd>(x: &mut [T]) {
         if j >= n {
             // both childrens are out of bound
             return;
-        }
-        if x[j] > x[i] && (k == n || x[j] > x[k]) {
-            x.swap(i, j);
-            i = j; // take place of your first child
-        } else if k < n && x[k] > x[i] {
-            x.swap(i, k);
-            i = k; // take place of your second child
+        } else if k >= n {
+            // j is the last child
+            if x[j] > x[i] {
+                x.swap(i, j);
+            }
+            return;
         } else {
-            return; // or stay where you are
+            // both children are in bound
+            if x[j] > x[i] && x[j] >= x[k] {
+                x.swap(i, j);
+                i = j;
+            } else if x[k] > x[i] {
+                x.swap(i, k);
+                i = k;
+            } else {
+                return;
+            }
         }
     }
 }
